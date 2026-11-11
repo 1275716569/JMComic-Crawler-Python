@@ -321,8 +321,9 @@ def cover_option_config(option: JmOption):
     if suffix is not None:
         option.download.image.suffix = fix_suffix(suffix)
 
-    pdf_option = env('PDF_OPTION', None)
-    convert_to_jpeg = bool(pdf_option and pdf_option != '否')
+    # 保留 PDF_OPTION 输入名，兼容已有的工作流调用。
+    pdf_option = env('PDF_OPTION', '是 | 章节维度合并长图')
+    convert_to_jpeg = pdf_option in {'是 | 本子维度合并pdf', '是 | 章节维度合并pdf'}
 
     try:
         image_quality = int(env('IMAGE_QUALITY', '100'))
@@ -353,7 +354,16 @@ def cover_option_config(option: JmOption):
             },
         })
 
-    if pdf_option and pdf_option != '否':
+    if pdf_option == '是 | 章节维度合并长图':
+        option.plugins.setdefault('after_photo', []).append({
+            'plugin': LongImgPlugin.plugin_key,
+            'kwargs': {
+                'img_dir': os.path.join(option.dir_rule.base_dir, 'long_img'),
+                'filename_rule': '[JM{Aid}] 第{Pindex}章-JM{Pid}-{Ptitle}',
+                'delete_original_file': True,
+            },
+        })
+    elif convert_to_jpeg:
         call_when = 'after_album' if pdf_option == '是 | 本子维度合并pdf' else 'after_photo'
         
         pdf_name_rule = env('PDF_NAME_RULE', None)
@@ -371,7 +381,7 @@ def cover_option_config(option: JmOption):
                 'delete_original_file': True,
             }
         }]
-        option.plugins[call_when] = plugin
+        option.plugins.setdefault(call_when, []).extend(plugin)
 
 
 def log_before_raise():
